@@ -1,12 +1,13 @@
 #!/usr/bin/python
 
 # Display Mode (I2C or GPIO)
-lcd_mode = I2C
+lcd_mode = "I2C"
 
 # I2C
-expander = None
-address = None
-port = None
+expander = "PCF8574"
+address = 0x27
+port = 1
+backlight_enabled = "True"
 
 # GPIO
 pin_rs = None
@@ -16,8 +17,8 @@ pins_data = None
 numbering_mode = None
 
 # Shared
-cols = None
-rows = None
-dotsize = None
-charmap = None
-auto_linebreaks = None
+cols = 20
+rows = 4
+dotsize = 8
+charmap = "A02"
+auto_linebreaks = True
