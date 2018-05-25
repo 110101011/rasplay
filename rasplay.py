@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 """rasplay.py: Python script that display's system information on to a 
 HD44870 charlcd from a Raspberry Pi either via GPIO or I2C"""
@@ -10,6 +10,7 @@ import os.path
 import logging, sys
 import socket
 import subprocess
+import asyncio
 
 import config
 
@@ -17,19 +18,18 @@ __author__ = 'Justin Verel'
 __copyright__ = '...'
 __license__ = '...'
 __date__ = '23-04-2018'
-__version__ = '0.1.0'
+__version__ = '0.2.5'
 __maintainer__ = 'Justin Verel'
 __email__ = 'justin@marverinc.nl'
 __status__ = 'Development'
 
 lcd = None
+lcddata = []
 first_run = True
 
 SOCKPATH = "/var/run/lirc/lircd"
 
 sock = None
-
-prev_key = "KEY_0"
 
 graden = (
 	0b00000,
@@ -46,41 +46,48 @@ logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
 def main():
 	#main function
+	logging.debug("Starting up display")
 	setup_display()
+	logging.debug("Starting up irw socket")
 	init_irw()
-
-	global prev_key
 
 	lcd.write_string('Raspberry Pi')
 	lcd.cursor_pos = (2, 0)
 	lcd.write_string('Rasplay Booting up')
-
-#	lcd.backlight_enabled = 0.9
 	
 	live = True
 
-#	time.sleep(5)
-	
+	time.sleep(2)	
+
+	now_key = 'KEY_1'
+
 	#Create While loop
+	logging.debug("Starting while loop")
 	while live == True:
 		now_key = next_key()
-		if not now_key:
-			logging.debug("next_key() is Empty")
-			get_command(prev_key)
-		else:
-			logging.debug("next_key() is %s", next_key())
-			prev_key == now_key
-			get_command(now_key)
+		logging.debug("now_key == " + now_key)
+		while now_key == 'KEY_1':
+			logging.debug("show_date()")
+			show_date()
+			time.sleep(1)
+						
+			for rows in range(len(lcddata)):
+				lcd.cursor_pos = (lcddata[rows][0], lcddata[rows][1])
+				lcd.write_string(lcddata[rows][2])
+			if now_key != "KEY_1":
+				break
+		while now_key == "":
+			print("Fucked")
+			break
 
 	#Close connection to lcd and clear
 	lcd.close(clear=True)
 
 def setup_display():
-	global lcd	
+	global lcd
 
 	#Setup display in GPIO or I2C mode
 	if config.lcd_mode == 'I2C':
-		logging.debug('I2C')
 		from RPLCD.i2c import CharLCD
 		lcd = CharLCD("PCF8574", address=config.address, port=config.port,
 				cols=config.cols, rows=config.rows, dotsize=config.dotsize,
@@ -101,10 +108,10 @@ def setup_display():
 def init_irw():
 	global sock
 	sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-	print ('starting up on %s' % SOCKPATH)
+	logging.debug('starting up on %s' % SOCKPATH)
 	sock.connect(SOCKPATH)
 
-def next_key():
+async def next_key():
 	while True:
 		data = sock.recv(128)
 		data.strip()
@@ -142,18 +149,11 @@ def get_cpu_speed():
 
 def show_info():
 	#Show information on display
-	global first_run
-	#get_command()
-	#first_time = True
-	if first_run == True:
-		lcd.clear()
-		first_run = False
-		logging.debug(first_run)
-
-#	lcd.backlight_enabled = 0.1
-	
-#	date = datetime.datetime.now().strftime("%d-%m-%y")
-#	time = datetime.datetime.now().strftime("%H:%M:%S")
+	global lcddata
+#	if first_run == True:
+#		lcd.clear()
+#		first_run = False
+#		logging.debug(first_run)
 
 	ip_address = get_ip()
 
@@ -161,10 +161,6 @@ def show_info():
 
 	lcd.create_char(0, graden)
 
-#	lcd.cursor_pos = (0, 0)
-#	lcd.write_string(date)
-#	lcd.cursor_pos = (0,12)
-#	lcd.write_string(time)
 	lcd.cursor_pos = (1, 0)
 	lcd.write_string("IP:  " + ip_address)
 	lcd.cursor_pos = (2, 0)
@@ -178,23 +174,36 @@ def show_info():
 
 def show_date():
 	#Show Date and Time
-	global first_run
-
-	if first_run == True:
-		lcd.clear()
-		first_run = False
+	global lcddata
 
 	date = datetime.datetime.now().strftime("%d-%m-%y")
 	time = datetime.datetime.now().strftime("%H:%M:%S")
 
-	lcd.cursor_pos = (0, 0)
-	lcd.write_string(date)
-	lcd.cursor_pos = (0, 12)
-	lcd.write_string(time)
+	lcddata = [0, 0, date], [0, 12, time]
+
+	return lcddata
 
 def show_cpu():
 	#Show CPU and GPU information
-	get_command()
+	global lcddata
+
+	cpu, gpu = getTemp()
+
+	lcd.create_char(0, graden)
+
+	cpu_speed_string = "CPU: " + str(get_cpu_speed()) + " Mhz"
+	cpu_temp_string = str(cpu) + "\x00C"
+	gpu_string = "GPU:"
+	gpu_temp_string = str(gpu)
+
+	print(cpu_speed_string)
+	print(cpu_temp_string)
+	print(gpu_string)
+	print(gpu_temp_string)
+
+	lcddata = [0, 0, cpu_speed_string], [0, 14, cpu_temp_string], [1, 0, gpu_string], [1, 14, gpu_temp_string]
+
+	return lcddata
 
 def show_network():
 	#Show Network information
@@ -202,6 +211,7 @@ def show_network():
 
 def get_command(key):
 	#Get Command from remote
+	logging.debug("Key: %s", key)
 	global first_run
 	if key == "KEY_0":
 		first_run = True
