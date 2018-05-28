@@ -215,7 +215,7 @@ def show_cpu():
 	gpu_string = "GPU:"
 	gpu_temp_string = str(gpu)
 
-	lcddata = [0, 0, cpu_string], [0, 11, cpu_speed_string], [1, 14, cpu_temp_string], [2, 0, gpu_string], [3, 14, gpu_temp_string]
+	lcddata = [0, 0, cpu_string], [0, 10, cpu_speed_string], [1, 13, cpu_temp_string], [2, 0, gpu_string], [3, 13, gpu_temp_string]
 
 	return lcddata
 
@@ -230,20 +230,6 @@ def show_network():
 	lcddata = [0, 0, ip_string], [1, 0, ip_address]
 
 	return lcddata
-
-#def get_command(key):
-#	#Get Command from remote
-#	logging.debug("Key: %s", key)
-#	global first_run
-#	if key == "KEY_0":
-#		first_run = True
-#		show_info()
-#	elif key == "KEY_1":
-#		first_run = True
-#		show_date()
-#	else:
-#		first_run = True
-#		show_info()
 
 if __name__ == "__main__":
 	main()
