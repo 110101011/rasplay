@@ -30,15 +30,18 @@ __status__ = 'Development'
 lcddata = []
 live = True
 logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+key = "KEY_1"
 
 def main():
+	global key
+
 	# main function
 	logging.debug("Starting up display")
 	setup_display()
 	irw.init()
 	mpd_functions.init()
 
-	key = "KEY_1"
+#	key = "KEY_1"
 
 	thread = irw.NextKey(irw.next_key)
 	thread.start()
@@ -84,12 +87,13 @@ def main():
 			for rows in range(len(lcddata)):
 				lcd.cursor_pos = (lcddata[rows][0], lcddata[rows][1])
 				lcd.write_string(lcddata[rows][2])
-		elif irw.now_key == "KEY_6":
+		elif irw.now_key == "KEY_6" or irw.now_key == "KEY_PLAYPAUSE":
 			key = irw.now_key
 			show_mpd()
 			time.sleep(1)
 			for rows in range(len(lcddata)):
 				lcd.cursor_pos = (lcddata[rows][0], lcddata[rows][1])
+#				print(lcddata[rows][2])
 				lcd.write_string(lcddata[rows][2])
 		else:
 			print("Not assigned at the moment!")
@@ -174,6 +178,7 @@ def show_disk():
 def show_mpd():
 	# (6) Show MPD information
 	global lcddata
+	global key
 
 	print("MPD Information")
 
@@ -185,17 +190,15 @@ def show_mpd():
 
 			level = mpd_functions.mpd_volume_show()
 			elapsed = mpd_functions.mpd_elapsed_time()
-#			duration = mpd_functions.mpd_duration_time()
-
-#			time = elapsed + "/" + duration
-			print(mpd_functions.client.currentsong())
 
 			artist = mpd_functions.client.currentsong()['artist']
 			title = mpd_functions.client.currentsong()['title']
 			title = (title[:17] + '..') if len(title) > 17 else title
 
 			lcddata = [0, 0, "MPD Client"], [1, 0, artist], [2, 0, title], [3, 0, elapsed], [3, 16, level]
-
+			if irw.now_key == "KEY_PLAYPAUSE":
+				mpd_functions.mpd_play_pause()
+				key = "KEY_6"
 	return lcddata
 
 """			if key == KEY_PLAYPAUZE:

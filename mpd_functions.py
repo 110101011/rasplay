@@ -9,10 +9,10 @@ def init():
 	client = MPDClient()
 	client.idletimeout = 10
 	client.connect("localhost", 6600)
-	print("client connected")
+#	print("client connected")
 
-# Play/Pauze
-def mpd_play_pauze():
+# Play/Pause
+def mpd_play_pause():
 	client.pause()
 
 # Next song
