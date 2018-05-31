@@ -3,61 +3,42 @@
 """rasplay.py: Python script that display's system information on to a 
 HD44870 charlcd from a Raspberry Pi either via GPIO or I2C"""
 
-#imports
+# imports
 import time
 import datetime
 import os.path
 import logging, sys
-import socket
-import subprocess
 import threading
 
+# Local imports
 import config
+import custom_characters
+import functions
+import irw
 
 __author__ = 'Justin Verel'
 __copyright__ = '...'
 __license__ = '...'
 __date__ = '23-04-2018'
-__version__ = '0.2.5'
+__last_modified__ = '31-05-2018'
+__version__ = '0.3.3'
 __maintainer__ = 'Justin Verel'
 __email__ = 'justin@marverinc.nl'
 __status__ = 'Development'
 
-lcd = None
 lcddata = []
-first_run = True
-
-SOCKPATH = "/var/run/lirc/lircd"
-
-sock = None
 live = True
-
-graden = (
-	0b00000,
-	0b00100,
-	0b01010,
-	0b00100,
-	0b00000,
-	0b00000,
-	0b00000,
-	0b00000,
-)
-
 logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
 def main():
-	#main function
-	global now_key
-
+	# main function
 	logging.debug("Starting up display")
 	setup_display()
-	logging.debug("Starting up irw socket")
-	init_irw()
+	irw.init()
 
-	now_key = "KEY_1"
 	key = "KEY_1"
 
-	thread = NextKey(next_key)
+	thread = irw.NextKey(irw.next_key)
 	thread.start()
 
 	lcd.write_string('Raspberry Pi')
@@ -68,48 +49,57 @@ def main():
 	lcd.clear()
 
 	#Create While loop
-	logging.debug("Starting while loop")
 	while live == True:
-		#logging.debug("now_key = %s", now_key)
-
-		if key != now_key:
+		if key != irw.now_key:
 			lcd.clear()
 
-		key = now_key
-		if now_key == 'KEY_1':
-			logging.debug("show_date() - " + now_key)
-			key = now_key
+		key = irw.now_key
+		if irw.now_key == 'KEY_1':
+			key = irw.now_key
 			show_date()
 			time.sleep(1)
 			for rows in range(len(lcddata)):
 				lcd.cursor_pos = (lcddata[rows][0], lcddata[rows][1])
 				lcd.write_string(lcddata[rows][2])
-		elif now_key == "KEY_2":
-			logging.debug("show_cpu()- " + now_key)
-			key = now_key
+		elif irw.now_key == "KEY_2":
+			key = irw.now_key
 			show_cpu()
 			time.sleep(1)
 			for rows in range(len(lcddata)):
 				lcd.cursor_pos = (lcddata[rows][0], lcddata[rows][1])
 				lcd.write_string(lcddata[rows][2])
-		elif now_key == "KEY_3":
-			logging.debug("show_network() - " + now_key)
+		elif irw.now_key == "KEY_3":
+			key = irw.now_key
 			show_network()
 			time.sleep(1)
 			for rows in range(len(lcddata)):
 				lcd.cursor_pos = (lcddata[rows][0], lcddata[rows][1])
 				lcd.write_string(lcddata[rows][2])
+		elif irw.now_key == "KEY_4":
+			key = irw.now_key
+			show_disk()
+			time.sleep(1)
+			for rows in range(len(lcddata)):
+				lcd.cursor_pos = (lcddata[rows][0], lcddata[rows][1])
+				lcd.write_string(lcddata[rows][2])
+		elif irw.now_key == "KEY_6":
+			key = irw.now_key
+			show_mpd()
+			time.sleep(1)
+			for rows in range(len(lcddata)):
+				lcd.cursor_pos = (lcddata[rows][0], lcddata[rows][1])
+				lcd.write_string(lcddata[rows][2])
 		else:
-			print("Fucked")
+			print("Not assigned at the moment!")
 			time.sleep(1)
 
-	#Close connection to lcd and clear
+	# Close connection to lcd and clear
 	lcd.close(clear=True)
 
 def setup_display():
 	global lcd
 
-	#Setup display in GPIO or I2C mode
+	# Setup display in GPIO or I2C mode
 	if config.lcd_mode == 'I2C':
 		from RPLCD.i2c import CharLCD
 		lcd = CharLCD("PCF8574", address=config.address, port=config.port,
@@ -125,71 +115,11 @@ def setup_display():
 				cols=config.cols, rows=config.rows, dotsize=config.dotsize,
 				charmap=config.charmap, auto_linebreaks=config.auto_linebreaks)
 	else:
-		#Error no lcd mode has been set!
+		# Error no lcd mode has been set!
 		logging.debug('LCD Mode has not been set!')
 
-def init_irw():
-	global sock
-	sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-	logging.debug('starting up on %s' % SOCKPATH)
-	sock.connect(SOCKPATH)
-
-class NextKey(threading.Thread):
-
-	def __init__(self, function_next_key):
-		threading.Thread.__init__(self)
-		self.runnable = function_next_key
-		self.deamon = True
-
-	def run(self):
-		self.runnable()
-
-def next_key():
-	global now_key
-	while live == True:
-		while True:
-			data = sock.recv(128)
-			data.strip()
-			if data:
-				break
-		words = data.split()
-		key = str(words[2])
-		key = key.split("b'")[1]
-		key = key.split("'")[0]
-		now_key = key
-
-def get_ip():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        # doesn't even have to be reachable
-        s.connect(('10.255.255.255', 1))
-        IP = s.getsockname()[0]
-    except:
-        IP = '127.0.0.1'
-    finally:
-        s.close()
-    return IP
-
-def getTemp():
-	"""Get Temperature""" 
-	cpu = subprocess.Popen("cat /sys/class/thermal/thermal_zone0/temp", shell=True, stdout=subprocess.PIPE).stdout.read()
-	cpu = float(cpu) / 1000
-	cpu = round(cpu, 1)
-
-	gpu = subprocess.Popen("vcgencmd measure_temp", shell=True, stdout=subprocess.PIPE).stdout.read()
-	gpu = gpu.decode('utf-8')
-	gpu = gpu.replace("temp=", "")
-	gpu = gpu.replace("'C", "\x00C")
-
-	return cpu, gpu
-
-def get_cpu_speed():
-    cpu_speed = subprocess.Popen("cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq", shell=True, stdout=subprocess.PIPE).stdout.read()
-    cpu_speed = int(cpu_speed) / 1000
-    return cpu_speed
-
 def show_date():
-	#Show Date and Time
+	# (1) Show Date and Time
 	global lcddata
 
 	day = datetime.datetime.now().strftime("%A")
@@ -202,15 +132,15 @@ def show_date():
 	return lcddata
 
 def show_cpu():
-	#Show CPU and GPU information
+	# (2) Show CPU and GPU information
 	global lcddata
 
-	cpu, gpu = getTemp()
+	cpu, gpu = functions.getTemp()
 
-	lcd.create_char(0, graden)
+	lcd.create_char(0, custom_characters.graden)
 
 	cpu_string = "CPU: "
-	cpu_speed_string = str(get_cpu_speed()) + " Mhz"
+	cpu_speed_string = str(functions.get_cpu_speed()) + " Mhz"
 	cpu_temp_string = str(cpu) + "\x00C"
 	gpu_string = "GPU:"
 	gpu_temp_string = str(gpu)
@@ -220,16 +150,55 @@ def show_cpu():
 	return lcddata
 
 def show_network():
-	#Show Network information
+	# (3) Show Network information
 	global lcddata
 
-	ip_address = get_ip()
+	ip_address = functions.get_ip()
 
 	ip_string = "ip address:"
 
 	lcddata = [0, 0, ip_string], [1, 0, ip_address]
 
 	return lcddata
+
+def show_disk():
+	# (4) Show Disk information
+	global lcddata
+
+	print("Disk information")
+
+	lcddata = []
+
+def show_mpd():
+	# (6) Show MPD information
+	global lcddata
+
+	print("MPD Information")
+
+"""	if mpd == running:
+		if mpd == playing:
+			Show Artist / Song / Time played / Total time / Volume
+			if key == KEY_PLAYPAUZE:
+				Play / Pauze song and set key to KEY_6
+			if key == KEY_NEXT:
+				Play next song and set key to KEY_6
+			if key == KEY_PREV:
+				Play previous song and set key to KEY_6
+			if key == KEY_VOLUMEUP:
+				Turn volume up and set key to KEY_6
+			if key == KEY_VOLUMEDOWN:
+				Turn volume down an set key to KEY_6
+		if mpd == stopped:
+			Show playlists (Scroll with Prev / Next and select with PlayPauze)
+			if key == KEY_PLAY:
+				Play selected playlist and set key to KEY_6
+			if key == KEY_NEXT:
+				Select next playlist and set key to KEY_6
+			if key == KEY_PREV:
+				Select previous playlist and set key to KEY_6
+"""
+
+	lcddata = []
 
 if __name__ == "__main__":
 	main()
