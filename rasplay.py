@@ -15,6 +15,7 @@ import config
 import custom_characters
 import functions
 import irw
+import mpd_functions
 
 __author__ = 'Justin Verel'
 __copyright__ = '...'
@@ -35,6 +36,7 @@ def main():
 	logging.debug("Starting up display")
 	setup_display()
 	irw.init()
+	mpd_functions.init()
 
 	key = "KEY_1"
 
@@ -175,10 +177,28 @@ def show_mpd():
 
 	print("MPD Information")
 
-"""	if mpd == running:
-		if mpd == playing:
-			Show Artist / Song / Time played / Total time / Volume
-			if key == KEY_PLAYPAUZE:
+	mpd = "running"
+
+	if mpd == "running":
+		if mpd_functions.client.status()['state'] == "play":
+			# Show Artist / Song / Time played / Total time / Volume
+
+			level = mpd_functions.mpd_volume_show()
+			elapsed = mpd_functions.mpd_elapsed_time()
+#			duration = mpd_functions.mpd_duration_time()
+
+#			time = elapsed + "/" + duration
+			print(mpd_functions.client.currentsong())
+
+			artist = mpd_functions.client.currentsong()['artist']
+			title = mpd_functions.client.currentsong()['title']
+			title = (title[:17] + '..') if len(title) > 17 else title
+
+			lcddata = [0, 0, "MPD Client"], [1, 0, artist], [2, 0, title], [3, 0, elapsed], [3, 16, level]
+
+	return lcddata
+
+"""			if key == KEY_PLAYPAUZE:
 				Play / Pauze song and set key to KEY_6
 			if key == KEY_NEXT:
 				Play next song and set key to KEY_6
@@ -198,7 +218,7 @@ def show_mpd():
 				Select previous playlist and set key to KEY_6
 """
 
-	lcddata = []
+#	return lcddata
 
 if __name__ == "__main__":
 	main()
